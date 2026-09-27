@@ -1,0 +1,17 @@
+[project]
+name = "cogtic-subscription-backend"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Ramkumar Selvaraj", email = "ramkumar.199873@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = []
+
+[project.scripts]
+cogtic-subscription-backend = "cogtic_subscription_backend:main"
+
+[build-system]
+requires = ["uv_build>=0.12.19,<0.13.0"]
+build-backend = "uv_build"
