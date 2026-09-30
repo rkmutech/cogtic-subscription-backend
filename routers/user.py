@@ -1,7 +1,8 @@
-from fastapi import FastAPI
+from fastapi import APIRouter
 
-app = FastAPI()
+router = APIRouter(prefix="/user", tags=["User"])
 
-@app.get("/login")
-async def read_users():
+
+@router.get("/login")
+async def login_user():
     return [{"username": "user1"}, {"username": "user2"}]
