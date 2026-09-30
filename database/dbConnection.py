@@ -7,10 +7,6 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 from config.app_logger import logger
 from config.config import settings
-from models.user import User
-from routers.secrect.authcationAndTokenCreation import decodeAccessToken
-from models.user import Role
-
 engine = create_engine(settings.DB_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -53,7 +49,7 @@ def create_database_if_missing():
 
 
 def commit_with_logging(db, operation: str) -> None:
-    """Commit a session, rolling it back and logging details on failure."""
+   
     try:
         db.commit()
     except SQLAlchemyError as exc:
@@ -85,10 +81,10 @@ def flush_with_logging(db, operation: str) -> None:
         )
         raise
 
-oauth2Scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
-def getDb():
+def get_db():
     try:
         db = SessionLocal()
     except Exception:
@@ -104,8 +100,10 @@ def getDb():
             raise
 
 
-def getCurrentUser(token: str = Depends(oauth2Scheme), db=Depends(getDb)):
-   
+def get_current_user(token: str = Depends(oauth2_scheme), db=Depends(get_db)):
+    from models.user import User
+    from routers.secrect.authcationAndTokenCreation import decodeAccessToken
+
     payload = decodeAccessToken(token)
     email = payload.get("sub") if payload else None
     if not email:
@@ -116,9 +114,15 @@ def getCurrentUser(token: str = Depends(oauth2Scheme), db=Depends(getDb)):
     return user
 
 
-def require_admin(current_user=Depends(getCurrentUser)):
-    
+def require_admin(current_user=Depends(get_current_user)):
+    from models.user import Role
 
     if current_user.role != Role.admin:
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
+
+
+# CamelCase aliases keep existing router imports working during migration.
+getDb = get_db
+getCurrentUser = get_current_user
+requireAdmin = require_admin

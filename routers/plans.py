@@ -3,7 +3,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from config.app_logger import logger
-from database.dbConnection import getDb, require_admin
+from database.dbConnection import getDb, requireAdmin
 from models.billing import Plan
 from schema.billing import PlanCreate, PlanOut
 
@@ -16,7 +16,7 @@ def list_plans(db: Session = Depends(getDb)):
 
 
 @router.post("", response_model=PlanOut, status_code=status.HTTP_201_CREATED,
-             dependencies=[Depends(require_admin)])
+             dependencies=[Depends(requireAdmin)])
 def create_plan(payload: PlanCreate, db: Session = Depends(getDb)):
     plan = Plan(**payload.model_dump())
     db.add(plan)

@@ -6,7 +6,7 @@ from database.dbConnection import (
     commit_with_logging,
     getCurrentUser,
     getDb,
-    require_admin,
+    requireAdmin,
 )
 from models.billing import Plan, Tenant
 from models.user import Role, User
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/tenants", tags=["tenants"])
 
 
 @router.post("", response_model=TenantOut, status_code=status.HTTP_201_CREATED,
-             dependencies=[Depends(require_admin)])
+             dependencies=[Depends(requireAdmin)])
 def create_tenant(payload: TenantCreate, db: Session = Depends(getDb)):
     if payload.plan_id is not None and db.get(Plan, payload.plan_id) is None:
         raise HTTPException(status_code=404, detail="Plan not found")
@@ -30,7 +30,7 @@ def create_tenant(payload: TenantCreate, db: Session = Depends(getDb)):
 
 
 @router.patch("/{tenant_id}/plan", response_model=TenantOut,
-              dependencies=[Depends(require_admin)])
+              dependencies=[Depends(requireAdmin)])
 def assign_plan(tenant_id: int, payload: TenantPlanUpdate, db: Session = Depends(getDb)):
     tenant = db.get(Tenant, tenant_id)
     if tenant is None:

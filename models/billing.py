@@ -71,7 +71,7 @@ class UsageRecord(Base):
 
 
 class UsageSummary(Base):
-    """Precomputed usage and overage totals for a tenant billing period."""
+   
 
     __tablename__ = "usage_summaries"
     __table_args__ = (
