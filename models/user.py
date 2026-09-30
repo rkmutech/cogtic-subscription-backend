@@ -1,6 +1,5 @@
 import enum
 from datetime import datetime
-
 from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
@@ -11,9 +10,8 @@ class Role(str, enum.Enum):
     admin = "admin"
     user = "user"
 
-
 class User(Base):
-    __tablename__ = "users"
+    __tablename__ = "user"
 
     id = Column(Integer, primary_key=True)
     email = Column(String, unique=True, index=True, nullable=False)
@@ -22,4 +20,4 @@ class User(Base):
     tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    #tenant = relationship("Tenant", back_populates="users")
+    tenant = relationship("Tenant", back_populates="users")
