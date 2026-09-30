@@ -11,7 +11,7 @@ from database.dbConnection import (
     engine,
     flush_with_logging,
 )
-from models.billing import Plan, Tenant, UsageRecord, UsageSummary  # noqa: F401
+from models.billing import Plan, Tenant, UsageAlert, UsageRecord, UsageSummary  # noqa: F401
 from models.user import Role, User
 from routers import admin, auth, plans, tenants, usage, user
 from routers.secrect.authcationAndTokenCreation import hash_password

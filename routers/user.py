@@ -16,6 +16,7 @@ from routers.secrect.authcationAndTokenCreation import (
     hash_password,
     verify_password,
 )
+from services.email_service import send_welcome_email
 from schema.billing import TenantPlanUpdate
 from schema.user import CompanyNameUpdate, CurrentUserOut, UserCreate, UserOut
 
@@ -27,14 +28,11 @@ def register(payload: UserCreate, db: Session = Depends(getDb)):
     if db.query(User).filter(User.email == payload.email).first():
         raise HTTPException(status_code=409, detail="Email already registered")
 
-    startPlan = db.query(Plan).filter(Plan.name == "Starter").first()
-    if startPlan is None:
-        raise HTTPException(status_code=503, detail="Starter plan is not configured")
-
     name = payload.name.strip()
     if not name:
         raise HTTPException(status_code=422, detail="Company name cannot be blank")
-    tenant = Tenant(name=name, plan_id=startPlan.id)
+    # New accounts start without a subscription; the user chooses one later.
+    tenant = Tenant(name=name)
     db.add(tenant)
     flush_with_logging(db, "create the new tenant")
     user = User(
@@ -47,6 +45,7 @@ def register(payload: UserCreate, db: Session = Depends(getDb)):
     commit_with_logging(db, "register the new user")
     db.refresh(user)
     logger.info("Registered user id=%s with tenant id=%s", user.id, tenant.id)
+    send_welcome_email(user.email, name)
     return user
 
 
@@ -80,14 +79,14 @@ def update_me(
     db: Session = Depends(getDb),
 ):
     if current_user.tenant is None:
-        raise HTTPException(status_code=409, detail="User has no company account")
+        raise HTTPException(status_code=409, detail="User has no  account")
     name = payload.name.strip()
     if not name:
-        raise HTTPException(status_code=422, detail="Company name cannot be blank")
+        raise HTTPException(status_code=422, detail=" name cannot be blank")
     current_user.tenant.name = name
-    commit_with_logging(db, "update the company name")
+    commit_with_logging(db, "update the  name")
     db.refresh(current_user)
-    logger.info("Updated company name for user id=%s", current_user.id)
+    logger.info("Updated  name for user id=%s", current_user.id)
     return {
         "id": current_user.id,
         "email": current_user.email,
@@ -107,6 +106,19 @@ def update_my_plan(
 ):
     if current_user.tenant is None:
         raise HTTPException(status_code=409, detail="User has no company account")
+
+    if current_user.tenant.plan_id is not None:
+        current_plan = current_user.tenant.plan
+        plan_name = current_plan.name if current_plan is not None else "a plan"
+        if current_user.tenant.plan_id == payload.plan_id:
+            detail = f"You already have the {plan_name} plan."
+        else:
+            detail = (
+                f"You already have the {plan_name} plan. "
+                "You cannot purchase another plan while it is active."
+            )
+        raise HTTPException(status_code=409, detail=detail)
+
     plan = db.get(Plan, payload.plan_id)
     if plan is None:
         raise HTTPException(status_code=404, detail="Plan not found")

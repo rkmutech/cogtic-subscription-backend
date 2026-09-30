@@ -12,6 +12,17 @@ class PlanCreate(BaseModel):
     monthly_price: Decimal = Field(ge=0, maxDigits=10, decimalPlaces=2)
 
 
+class PlanUpdate(BaseModel):
+    name: str | None = Field(default=None, minLength=1, maxLength=50)
+    included_requests: int | None = Field(default=None, ge=0)
+    overage_rate: Decimal | None = Field(
+        default=None, ge=0, maxDigits=10, decimalPlaces=4
+    )
+    monthly_price: Decimal | None = Field(
+        default=None, ge=0, maxDigits=10, decimalPlaces=2
+    )
+
+
 class PlanOut(PlanCreate):
     id: int
     created_at: datetime

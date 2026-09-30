@@ -12,6 +12,7 @@ from models.billing import Plan, Tenant
 from models.user import Role, User
 from schema.billing import TenantCreate, TenantOut, TenantPlanUpdate, UsageSummaryOut
 from services.billing_service import calculate_usage_summary
+from services.usage_notification_service import notify_usage_thresholds
 
 router = APIRouter(prefix="/tenants", tags=["tenants"])
 
@@ -44,7 +45,7 @@ def assign_plan(tenant_id: int, payload: TenantPlanUpdate, db: Session = Depends
     return tenant
 
 
-@router.get("/{tenant_id}/usage-summary", response_model=UsageSummaryOut)
+@router.get("/{tenant_id}/usage-summary", response_model=UsageSummaryOut | None)
 def get_usage_summary(
     tenant_id: int,
     db: Session = Depends(getDb),
@@ -55,7 +56,12 @@ def get_usage_summary(
         raise HTTPException(status_code=404, detail="Tenant not found")
     if current_user.role != Role.admin and current_user.tenant_id != tenant.id:
         raise HTTPException(status_code=403, detail="Cannot access another tenant's usage")
+    # A user without a subscription has no plan-based usage summary yet.
+    if tenant.plan is None:
+        return None
     try:
-        return calculate_usage_summary(db, tenant)
+        summary = calculate_usage_summary(db, tenant)
+        notify_usage_thresholds(db, tenant, summary)
+        return summary
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc

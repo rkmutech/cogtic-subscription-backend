@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy import (
     BigInteger,
@@ -87,3 +87,21 @@ class UsageSummary(Base):
     overageCost = Column(Numeric(10, 2), nullable=False, default=0)
 
     tenant = relationship("Tenant", back_populates="usage_summaries")
+
+
+class UsageAlert(Base):
+    """Tracks usage threshold emails already sent in a billing period."""
+
+    __tablename__ = "usage_alerts"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id", "period_start", "threshold",
+            name="uq_usage_alert_tenant_period_threshold",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
+    period_start = Column(Date, nullable=False)
+    threshold = Column(Integer, nullable=False)
+    sent_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())

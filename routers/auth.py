@@ -9,13 +9,14 @@ from database.dbConnection import (
     getCurrentUser,
     getDb,
 )
-from models.billing import Plan, Tenant
+from models.billing import Tenant
 from models.user import Role, User
 from routers.secrect.authcationAndTokenCreation import (
     create_access_token,
     hash_password,
     verify_password,
 )
+from services.email_service import send_welcome_email
 from schema.user import CurrentUserOut, UserCreate, UserOut
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -26,15 +27,12 @@ def register(payload: UserCreate, db: Session = Depends(getDb)):
     if db.query(User).filter(User.email == payload.email).first():
         raise HTTPException(status_code=409, detail="Email already registered")
 
-    startPlan = db.query(Plan).filter(Plan.name == "Starter").first()
-    if startPlan is None:
-        raise HTTPException(status_code=503, detail="Starter plan is not configured")
-
     name = payload.name.strip()
     if not name:
         raise HTTPException(status_code=422, detail="Company name cannot be blank")
 
-    tenant = Tenant(name=name, plan_id=startPlan.id)
+    # New accounts start without a subscription; the user chooses one later.
+    tenant = Tenant(name=name)
     db.add(tenant)
     flush_with_logging(db, "create the new tenant")
 
@@ -48,6 +46,7 @@ def register(payload: UserCreate, db: Session = Depends(getDb)):
     commit_with_logging(db, "register the new user")
     db.refresh(user)
     logger.info("Registered user id=%s with tenant id=%s", user.id, tenant.id)
+    send_welcome_email(user.email, name)
     return user
 
 
