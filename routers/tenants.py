@@ -4,8 +4,8 @@ from sqlalchemy.orm import Session
 from config.app_logger import logger
 from database.dbConnection import (
     commit_with_logging,
-    get_current_user,
-    get_db,
+    getCurrentUser,
+    getDb,
     require_admin,
 )
 from models.billing import Plan, Tenant
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/tenants", tags=["tenants"])
 
 @router.post("", response_model=TenantOut, status_code=status.HTTP_201_CREATED,
              dependencies=[Depends(require_admin)])
-def create_tenant(payload: TenantCreate, db: Session = Depends(get_db)):
+def create_tenant(payload: TenantCreate, db: Session = Depends(getDb)):
     if payload.plan_id is not None and db.get(Plan, payload.plan_id) is None:
         raise HTTPException(status_code=404, detail="Plan not found")
     tenant = Tenant(**payload.model_dump())
@@ -31,7 +31,7 @@ def create_tenant(payload: TenantCreate, db: Session = Depends(get_db)):
 
 @router.patch("/{tenant_id}/plan", response_model=TenantOut,
               dependencies=[Depends(require_admin)])
-def assign_plan(tenant_id: int, payload: TenantPlanUpdate, db: Session = Depends(get_db)):
+def assign_plan(tenant_id: int, payload: TenantPlanUpdate, db: Session = Depends(getDb)):
     tenant = db.get(Tenant, tenant_id)
     if tenant is None:
         raise HTTPException(status_code=404, detail="Tenant not found")
@@ -47,8 +47,8 @@ def assign_plan(tenant_id: int, payload: TenantPlanUpdate, db: Session = Depends
 @router.get("/{tenant_id}/usage-summary", response_model=UsageSummaryOut)
 def get_usage_summary(
     tenant_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: Session = Depends(getDb),
+    current_user: User = Depends(getCurrentUser),
 ):
     tenant = db.get(Tenant, tenant_id)
     if tenant is None:

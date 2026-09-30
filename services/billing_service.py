@@ -33,16 +33,16 @@ def calculate_usage_summary(db: Session, tenant: Tenant, as_of: date | None = No
     if tenant.plan is None:
         raise ValueError("Tenant has no plan assigned")
 
-    period_start, period_end = billing_period(tenant.billing_cycle_start, as_of)
-    period_start_dt = datetime.combine(period_start, time.min)
-    period_end_dt = datetime.combine(period_end, time.min)
+    periodStart, periodEnd = billing_period(tenant.billing_cycle_start, as_of)
+    period_start_dt = datetime.combine(periodStart, time.min)
+    periodEnd_dt = datetime.combine(periodEnd, time.min)
     try:
-        total_usage = (
+        totalUsage = (
             db.query(func.coalesce(func.sum(UsageRecord.quantity), 0))
             .filter(
                 UsageRecord.tenant_id == tenant.id,
                 UsageRecord.recorded_at >= period_start_dt,
-                UsageRecord.recorded_at < period_end_dt,
+                UsageRecord.recorded_at < periodEnd_dt,
             )
             .scalar()
         )
@@ -50,18 +50,18 @@ def calculate_usage_summary(db: Session, tenant: Tenant, as_of: date | None = No
         logger.exception("Could not calculate usage for tenant id=%s", tenant.id)
         raise
     limit = tenant.plan.included_requests
-    overage_units = max(0, int(total_usage) - limit)
-    overage_cost = (Decimal(overage_units) * Decimal(tenant.plan.overage_rate)).quantize(
+    overageUnits = max(0, int(totalUsage) - limit)
+    overageCost = (Decimal(overageUnits) * Decimal(tenant.plan.overage_rate)).quantize(
         Decimal("0.01"), rounding=ROUND_HALF_UP
     )
 
     return {
         "plan_name": tenant.plan.name,
-        "period_start": period_start,
-        "period_end": period_end,
-        "total_usage": int(total_usage),
-        "plan_limit": limit,
-        "remaining": max(0, limit - int(total_usage)),
-        "overage_units": overage_units,
-        "overage_cost": overage_cost,
+        "periodStart": periodStart,
+        "periodEnd": periodEnd,
+        "totalUsage": int(totalUsage),
+        "planlimit": limit,
+        "remaining": max(0, limit - int(totalUsage)),
+        "overageUnits": overageUnits,
+        "overageCost": overageCost,
     }

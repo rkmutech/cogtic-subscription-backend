@@ -7,6 +7,9 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 from config.app_logger import logger
 from config.config import settings
+from models.user import User
+from routers.secrect.authcationAndTokenCreation import decodeAccessToken
+from models.user import Role
 
 engine = create_engine(settings.DB_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -82,10 +85,10 @@ def flush_with_logging(db, operation: str) -> None:
         )
         raise
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+oauth2Scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
-def get_db():
+def getDb():
     try:
         db = SessionLocal()
     except Exception:
@@ -101,11 +104,9 @@ def get_db():
             raise
 
 
-def get_current_user(token: str = Depends(oauth2_scheme), db=Depends(get_db)):
-    from models.user import User
-    from routers.secrect.authcationAndTokenCreation import decode_access_token
-
-    payload = decode_access_token(token)
+def getCurrentUser(token: str = Depends(oauth2Scheme), db=Depends(getDb)):
+   
+    payload = decodeAccessToken(token)
     email = payload.get("sub") if payload else None
     if not email:
         raise HTTPException(status_code=401, detail="Invalid authentication credentials")
@@ -115,8 +116,8 @@ def get_current_user(token: str = Depends(oauth2_scheme), db=Depends(get_db)):
     return user
 
 
-def require_admin(current_user=Depends(get_current_user)):
-    from models.user import Role
+def require_admin(current_user=Depends(getCurrentUser)):
+    
 
     if current_user.role != Role.admin:
         raise HTTPException(status_code=403, detail="Admin access required")

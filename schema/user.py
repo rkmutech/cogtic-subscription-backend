@@ -11,16 +11,16 @@ class UserOut(BaseModel):
     role: Role
     tenant_id: int | None
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(fromAttributes=True)
 
 
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
     name: str = Field(
-        min_length=1,
-        max_length=100,
-        validation_alias=AliasChoices("name", "company_name", "companyName"),
+        minLength=1,
+        maxLength=100,
+        validationAlias=AliasChoices("name", "name", "name"),
     )
 
 
@@ -36,4 +36,4 @@ class CurrentUserOut(BaseModel):
 
 
 class CompanyNameUpdate(BaseModel):
-    name: str = Field(min_length=1, max_length=100)
+    name: str = Field(minLength=1, maxLength=100)

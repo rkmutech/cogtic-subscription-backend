@@ -65,7 +65,7 @@ class UsageRecord(Base):
     usage_type = Column(String(30), nullable=False)
     quantity = Column(Integer, nullable=False, default=1, server_default="1")
     recorded_at = Column(DateTime, nullable=False, server_default=func.now())
-    metadata_json = Column("metadata", JSONB().with_variant(JSON(), "sqlite"), nullable=True)
+    metadataJson = Column("metadata", JSONB().with_variant(JSON(), "sqlite"), nullable=True)
 
     tenant = relationship("Tenant", back_populates="usage_records")
 
@@ -75,15 +75,15 @@ class UsageSummary(Base):
 
     __tablename__ = "usage_summaries"
     __table_args__ = (
-        UniqueConstraint("tenant_id", "period_start", name="uq_usage_summary_tenant_period"),
+        UniqueConstraint("tenant_id", "periodStart", name="uq_usage_summary_tenant_period"),
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
-    period_start = Column(Date, nullable=False)
-    period_end = Column(Date, nullable=False)
-    total_usage = Column(Integer, nullable=False, default=0)
-    overage_units = Column(Integer, nullable=False, default=0)
-    overage_cost = Column(Numeric(10, 2), nullable=False, default=0)
+    periodStart = Column(Date, nullable=False)
+    periodEnd = Column(Date, nullable=False)
+    totalUsage = Column(Integer, nullable=False, default=0)
+    overageUnits = Column(Integer, nullable=False, default=0)
+    overageCost = Column(Numeric(10, 2), nullable=False, default=0)
 
     tenant = relationship("Tenant", back_populates="usage_summaries")
