@@ -6,7 +6,7 @@ from models.billing import Tenant, UsageAlert
 from services.email_service import send_usage_alert
 
 
-USAGE_THRESHOLDS = (50, 70, 90, 100)
+USAGE_THRESHOLDS = (60, 90, 100)
 
 
 def notify_usage_thresholds(db: Session, tenant: Tenant, summary: dict) -> None:

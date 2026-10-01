@@ -1,52 +1,55 @@
-import smtplib
-import ssl
-from email.message import EmailMessage
+import asyncio
+
+from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
 
 from config.app_logger import logger
 from config.config import settings
 
 
 def send_email(recipient: str, subject: str, body: str) -> bool:
-    """Send one email via configured SMTP. Return False if mail is unavailable."""
-    sender = settings.MAIL_FROM or settings.SMTP_USERNAME
-    if not settings.SMTP_HOST or not sender:
+    """Send mail through FastAPI-Mail to the configured test account."""
+    sender = settings.SMTP_USERNAME
+    # Keep testing mail directed to the explicitly configured test inbox.
+    delivery_recipient = settings.MAIL_TO
+    if (
+        not settings.SMTP_HOST
+        or not sender
+        or not settings.SMTP_PASSWORD
+        or not delivery_recipient
+    ):
         logger.warning(
-            "Email to %s was not sent: configure SMTP_HOST and MAIL_FROM or SMTP_USERNAME",
-            recipient,
+            "Email was not sent: configure SMTP_HOST, SMTP_USERNAME, SMTP_PASSWORD, and MAIL_TO",
         )
         return False
 
-    message = EmailMessage()
-    message["From"] = sender
-    message["To"] = recipient
-    message["Subject"] = subject
-    message.set_content(body)
-
     try:
-        if settings.SMTP_PORT == 465:
-            with smtplib.SMTP_SSL(
-                settings.SMTP_HOST,
-                settings.SMTP_PORT,
-                timeout=15,
-                context=ssl.create_default_context(),
-            ) as smtp:
-                _send_with_auth(smtp, message)
-        else:
-            with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=15) as smtp:
-                if settings.SMTP_USE_TLS:
-                    smtp.starttls(context=ssl.create_default_context())
-                _send_with_auth(smtp, message)
-        logger.info("Sent email subject=%r to %s", subject, recipient)
+        asyncio.run(_send_fastapi_mail(sender, delivery_recipient, subject, body))
+        logger.info("Sent email subject=%r to %s", subject, delivery_recipient)
         return True
     except Exception:
-        logger.exception("Could not send email subject=%r to %s", subject, recipient)
+        logger.exception("Could not send email subject=%r to %s", subject, delivery_recipient)
         return False
 
 
-def _send_with_auth(smtp: smtplib.SMTP, message: EmailMessage) -> None:
-    if settings.SMTP_USERNAME and settings.SMTP_PASSWORD:
-        smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
-    smtp.send_message(message)
+async def _send_fastapi_mail(sender: str, recipient: str, subject: str, body: str) -> None:
+    mail_config = ConnectionConfig(
+        MAIL_USERNAME=settings.SMTP_USERNAME,
+        MAIL_PASSWORD=settings.SMTP_PASSWORD,
+        MAIL_FROM=sender,
+        MAIL_PORT=settings.SMTP_PORT,
+        MAIL_SERVER=settings.SMTP_HOST,
+        MAIL_STARTTLS=settings.SMTP_USE_TLS and settings.SMTP_PORT != 465,
+        MAIL_SSL_TLS=settings.SMTP_PORT == 465,
+        USE_CREDENTIALS=True,
+        VALIDATE_CERTS=True,
+    )
+    message = MessageSchema(
+        subject=subject,
+        recipients=[recipient],
+        body=body,
+        subtype=MessageType.plain,
+    )
+    await FastMail(mail_config).send_message(message)
 
 
 def send_welcome_email(email: str, account_name: str) -> bool:
@@ -71,6 +74,8 @@ def send_usage_alert(email: str, account_name: str, plan_name: str,
         f"Your {plan_name} plan has reached {threshold}% usage for this billing period.\n"
         f"Usage: {used:,} of {included:,} included requests\n"
         f"Billing period: {period_start} to {period_end}\n\n"
+        "Your plan includes 20 additional free requests after the included limit; "
+        "requests beyond that allowance are charged at your plan's overage rate.\n\n"
         "Sign in to Cogtic to review your usage and plan.\n"
     )
     return send_email(email, subject, body)

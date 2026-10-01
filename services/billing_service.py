@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from config.app_logger import logger
 from models.billing import Tenant, UsageRecord
 
+FREE_OVERAGE_REQUESTS = 20
+
 
 def _month_anchor(anchor: date, month_offset: int) -> date:
     month_index = anchor.year * 12 + anchor.month - 1 + month_offset
@@ -50,7 +52,7 @@ def calculate_usage_summary(db: Session, tenant: Tenant, as_of: date | None = No
         logger.exception("Could not calculate usage for tenant id=%s", tenant.id)
         raise
     limit = tenant.plan.included_requests
-    overageUnits = max(0, int(totalUsage) - limit)
+    overageUnits = max(0, int(totalUsage) - limit - FREE_OVERAGE_REQUESTS)
     overageCost = (Decimal(overageUnits) * Decimal(tenant.plan.overage_rate)).quantize(
         Decimal("0.01"), rounding=ROUND_HALF_UP
     )
@@ -65,3 +67,30 @@ def calculate_usage_summary(db: Session, tenant: Tenant, as_of: date | None = No
         "overageUnits": overageUnits,
         "overageCost": overageCost,
     }
+
+
+def save_usage_summary(db: Session, tenant: Tenant, summary: dict) -> None:
+    """Persist the computed summary for the tenant's active billing period."""
+    from models.billing import UsageSummary
+
+    stored_summary = (
+        db.query(UsageSummary)
+        .filter_by(tenant_id=tenant.id, periodStart=summary["periodStart"])
+        .first()
+    )
+    if stored_summary is None:
+        stored_summary = UsageSummary(
+            tenant_id=tenant.id,
+            periodStart=summary["periodStart"],
+            periodEnd=summary["periodEnd"],
+            totalUsage=summary["totalUsage"],
+            overageUnits=summary["overageUnits"],
+            overageCost=summary["overageCost"],
+        )
+        db.add(stored_summary)
+        return
+
+    stored_summary.periodEnd = summary["periodEnd"]
+    stored_summary.totalUsage = summary["totalUsage"]
+    stored_summary.overageUnits = summary["overageUnits"]
+    stored_summary.overageCost = summary["overageCost"]

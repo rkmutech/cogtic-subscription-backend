@@ -35,5 +35,5 @@ class CurrentUserOut(BaseModel):
 
 
 
-class CompanyNameUpdate(BaseModel):
+class nameUpdate(BaseModel):
     name: str = Field(minLength=1, maxLength=100)

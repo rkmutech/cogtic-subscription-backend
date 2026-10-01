@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -18,7 +20,8 @@ from routers.secrect.authcationAndTokenCreation import (
 )
 from services.email_service import send_welcome_email
 from schema.billing import TenantPlanUpdate
-from schema.user import CompanyNameUpdate, CurrentUserOut, UserCreate, UserOut
+from schema.user import nameUpdate, CurrentUserOut, UserCreate, UserOut
+from services.billing_service import calculate_usage_summary, save_usage_summary
 
 router = APIRouter(prefix="/user", tags=["User"])
 
@@ -74,7 +77,7 @@ def get_me(current_user: User = Depends(getCurrentUser)):
 
 @router.patch("/me", response_model=CurrentUserOut)
 def update_me(
-    payload: CompanyNameUpdate,
+    payload: nameUpdate,
     current_user: User = Depends(getCurrentUser),
     db: Session = Depends(getDb),
 ):
@@ -124,6 +127,9 @@ def update_my_plan(
         raise HTTPException(status_code=404, detail="Plan not found")
 
     current_user.tenant.plan_id = plan.id
+    current_user.tenant.billing_cycle_start = date.today()
+    summary = calculate_usage_summary(db, current_user.tenant)
+    save_usage_summary(db, current_user.tenant, summary)
     commit_with_logging(db, "update the subscription plan")
     db.refresh(current_user)
     logger.info("Updated plan for user id=%s to plan id=%s", current_user.id, plan.id)

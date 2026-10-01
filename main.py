@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from config.app_logger import configure_logging, logger
+from config.config import settings
 from database.dbConnection import (
     Base,
     SessionLocal,
@@ -31,7 +32,7 @@ async def handle_unexpected_error(request: Request, exc: Exception):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

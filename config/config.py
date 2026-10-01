@@ -18,7 +18,7 @@ class BaseConfig(BaseSettings):
     SMTP_USERNAME: str | None = None
     SMTP_PASSWORD: str | None = None
     SMTP_USE_TLS: bool = True
-    MAIL_FROM: str | None = None
+    MAIL_TO: str | None = None
     FRONTEND_URL: str = "http://localhost:6001"
 
     model_config = SettingsConfigDict(
