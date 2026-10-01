@@ -17,10 +17,10 @@ from models.user import Role, User
 from routers import admin, auth, plans, tenants, usage, user
 from routers.secrect.authcationAndTokenCreation import hash_password
 
-app = FastAPI()
+api = FastAPI()
 
 
-@app.exception_handler(Exception)
+@api.exception_handler(Exception)
 async def handle_unexpected_error(request: Request, exc: Exception):
     logger.error(
         "Unhandled exception for %s %s",
@@ -30,28 +30,20 @@ async def handle_unexpected_error(request: Request, exc: Exception):
     )
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.include_router(user.router)
-app.include_router(admin.router)
-app.include_router(auth.router)
-app.include_router(plans.router)
-app.include_router(tenants.router)
-app.include_router(usage.router)
+api.include_router(user.router)
+api.include_router(admin.router)
+api.include_router(auth.router)
+api.include_router(plans.router)
+api.include_router(tenants.router)
+api.include_router(usage.router)
 
 
-@app.get("/health")
+@api.get("/health")
 def health():
     return {"status": "ok"}
 
 
-@app.on_event("startup")
+@api.on_event("startup")
 def seed_demo_data():
     configure_logging()
     logger.info("Starting Cogtic subscription API initialization")
@@ -93,6 +85,17 @@ def seed_demo_data():
     finally:
         if db is not None:
             db.close()
+
+
+# Wrapping the entire FastAPI app also adds CORS headers to unhandled 500s,
+# allowing browser clients to see the actual backend error response.
+app = CORSMiddleware(
+    app=api,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 if __name__ == "__main__":

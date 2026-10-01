@@ -9,7 +9,7 @@ from services.email_service import send_usage_alert
 USAGE_THRESHOLDS = (60, 90, 100)
 
 
-def notify_usage_thresholds(db: Session, tenant: Tenant, summary: dict) -> None:
+async def notify_usage_thresholds(db: Session, tenant: Tenant, summary: dict) -> None:
     """Email the tenant's first registered user once per threshold and billing period."""
     if tenant.plan is None:
         return
@@ -38,7 +38,7 @@ def notify_usage_thresholds(db: Session, tenant: Tenant, summary: dict) -> None:
         if already_sent:
             continue
 
-        sent = send_usage_alert(
+        sent = await send_usage_alert(
             email=recipient.email,
             account_name=tenant.name,
             plan_name=tenant.plan.name,

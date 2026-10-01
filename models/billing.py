@@ -75,16 +75,16 @@ class UsageSummary(Base):
 
     __tablename__ = "usage_summaries"
     __table_args__ = (
-        UniqueConstraint("tenant_id", "periodStart", name="uq_usage_summary_tenant_period"),
+        UniqueConstraint("tenant_id", "period_start", name="uq_usage_summary_tenant_period"),
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
-    periodStart = Column(Date, nullable=False)
-    periodEnd = Column(Date, nullable=False)
-    totalUsage = Column(Integer, nullable=False, default=0)
-    overageUnits = Column(Integer, nullable=False, default=0)
-    overageCost = Column(Numeric(10, 2), nullable=False, default=0)
+    periodStart = Column("period_start", Date, nullable=False)
+    periodEnd = Column("period_end", Date, nullable=False)
+    totalUsage = Column("total_usage", Integer, nullable=False, default=0)
+    overageUnits = Column("overage_units", Integer, nullable=False, default=0)
+    overageCost = Column("overage_cost", Numeric(10, 2), nullable=False, default=0)
 
     tenant = relationship("Tenant", back_populates="usage_summaries")
 

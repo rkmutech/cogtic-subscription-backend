@@ -1,4 +1,4 @@
-import os
+﻿import os
 from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -13,11 +13,8 @@ class BaseConfig(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     CORS_ORIGINS: list[str] = ["http://localhost:6001"]
-    SMTP_HOST: str | None = None
-    SMTP_PORT: int = 587
-    SMTP_USERNAME: str | None = None
-    SMTP_PASSWORD: str | None = None
-    SMTP_USE_TLS: bool = True
+    FASTMAIL_API_TOKEN: str | None = None
+    FASTMAIL_FROM: str | None = None
     MAIL_TO: str | None = None
     FRONTEND_URL: str = "http://localhost:6001"
 

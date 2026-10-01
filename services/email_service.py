@@ -1,29 +1,27 @@
-import asyncio
-
-from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
+import httpx
 
 from config.app_logger import logger
 from config.config import settings
 
+JMAP_SESSION_URL = "https://api.fastmail.com/jmap/session"
+JMAP_USING = [
+    "urn:ietf:params:jmap:core",
+    "urn:ietf:params:jmap:mail",
+    "urn:ietf:params:jmap:submission",
+]
 
-def send_email(recipient: str, subject: str, body: str) -> bool:
-    """Send mail through FastAPI-Mail to the configured test account."""
-    sender = settings.SMTP_USERNAME
-    # Keep testing mail directed to the explicitly configured test inbox.
-    delivery_recipient = settings.MAIL_TO
-    if (
-        not settings.SMTP_HOST
-        or not sender
-        or not settings.SMTP_PASSWORD
-        or not delivery_recipient
-    ):
+
+async def send_email(recipient: str, subject: str, body: str) -> bool:
+    """Send mail through the Fastmail JMAP API to the configured test inbox."""
+    delivery_recipient = settings.MAIL_TO  # keep testing mail going to the test inbox
+    if not settings.FASTMAIL_API_TOKEN or not settings.FASTMAIL_FROM or not delivery_recipient:
         logger.warning(
-            "Email was not sent: configure SMTP_HOST, SMTP_USERNAME, SMTP_PASSWORD, and MAIL_TO",
+            "Email was not sent: configure FASTMAIL_API_TOKEN, FASTMAIL_FROM, and MAIL_TO",
         )
         return False
 
     try:
-        asyncio.run(_send_fastapi_mail(sender, delivery_recipient, subject, body))
+        await _send_jmap(settings.FASTMAIL_FROM, delivery_recipient, subject, body)
         logger.info("Sent email subject=%r to %s", subject, delivery_recipient)
         return True
     except Exception:
@@ -31,28 +29,63 @@ def send_email(recipient: str, subject: str, body: str) -> bool:
         return False
 
 
-async def _send_fastapi_mail(sender: str, recipient: str, subject: str, body: str) -> None:
-    mail_config = ConnectionConfig(
-        MAIL_USERNAME=settings.SMTP_USERNAME,
-        MAIL_PASSWORD=settings.SMTP_PASSWORD,
-        MAIL_FROM=sender,
-        MAIL_PORT=settings.SMTP_PORT,
-        MAIL_SERVER=settings.SMTP_HOST,
-        MAIL_STARTTLS=settings.SMTP_USE_TLS and settings.SMTP_PORT != 465,
-        MAIL_SSL_TLS=settings.SMTP_PORT == 465,
-        USE_CREDENTIALS=True,
-        VALIDATE_CERTS=True,
-    )
-    message = MessageSchema(
-        subject=subject,
-        recipients=[recipient],
-        body=body,
-        subtype=MessageType.plain,
-    )
-    await FastMail(mail_config).send_message(message)
+async def _jmap_call(client: httpx.AsyncClient, api_url: str, calls: list) -> list:
+    resp = await client.post(api_url, json={"using": JMAP_USING, "methodCalls": calls})
+    resp.raise_for_status()
+    responses = resp.json()["methodResponses"]
+    for name, args, _ in responses:
+        if name == "error" or args.get("notCreated"):
+            raise RuntimeError(f"JMAP error: {args}")
+    return responses
 
 
-def send_welcome_email(email: str, account_name: str) -> bool:
+async def _send_jmap(sender: str, recipient: str, subject: str, body: str) -> None:
+    headers = {"Authorization": f"Bearer {settings.FASTMAIL_API_TOKEN}"}
+    async with httpx.AsyncClient(headers=headers, timeout=15) as client:
+        # 1. Discover account + API URL
+        resp = await client.get(JMAP_SESSION_URL)
+        resp.raise_for_status()
+        session = resp.json()
+        api_url = session["apiUrl"]
+        account_id = session["primaryAccounts"]["urn:ietf:params:jmap:mail"]
+
+        # 2. Find the Drafts mailbox and the sending identity
+        lookup = await _jmap_call(client, api_url, [
+            ["Mailbox/query", {"accountId": account_id, "filter": {"role": "drafts"}}, "0"],
+            ["Identity/get", {"accountId": account_id}, "1"],
+        ])
+        drafts_id = lookup[0][1]["ids"][0]
+        identities = lookup[1][1]["list"]
+        identity = next(
+            (i for i in identities if i["email"].lower() == sender.lower()),
+            None,
+        )
+        if identity is None:
+            raise RuntimeError(f"{sender} is not a sending identity in this Fastmail account")
+
+        # 3. Create the message and submit it in a single request
+        await _jmap_call(client, api_url, [
+            ["Email/set", {
+                "accountId": account_id,
+                "create": {"msg": {
+                    "mailboxIds": {drafts_id: True},
+                    "keywords": {"$draft": True},
+                    "from": [{"email": identity["email"]}],
+                    "to": [{"email": recipient}],
+                    "subject": subject,
+                    "bodyValues": {"b": {"value": body}},
+                    "textBody": [{"partId": "b", "type": "text/plain"}],
+                }},
+            }, "0"],
+            ["EmailSubmission/set", {
+                "accountId": account_id,
+                "create": {"sub": {"identityId": identity["id"], "emailId": "#msg"}},
+                "onSuccessUpdateEmail": {"#sub": {"keywords/$draft": None}},
+            }, "1"],
+        ])
+
+
+async def send_welcome_email(email: str, account_name: str) -> bool:
     login_url = f"{settings.FRONTEND_URL.rstrip('/')}/login"
     body = (
         f"Hello {account_name},\n\n"
@@ -62,12 +95,19 @@ def send_welcome_email(email: str, account_name: str) -> bool:
         "Use the password you chose during registration. For security, "
         "we never send passwords by email. Choose a subscription plan after logging in.\n"
     )
-    return send_email(email, "Welcome to Cogtic", body)
+    return await send_email(email, "Welcome to Cogtic", body)
 
 
-def send_usage_alert(email: str, account_name: str, plan_name: str,
-                     used: int, included: int, threshold: int,
-                     period_start: object, period_end: object) -> bool:
+async def send_usage_alert(
+    email: str,
+    account_name: str,
+    plan_name: str,
+    used: int,
+    included: int,
+    threshold: int,
+    period_start: object,
+    period_end: object,
+) -> bool:
     subject = f"Cogtic usage reached {threshold}%"
     body = (
         f"Hello {account_name},\n\n"
@@ -78,4 +118,4 @@ def send_usage_alert(email: str, account_name: str, plan_name: str,
         "requests beyond that allowance are charged at your plan's overage rate.\n\n"
         "Sign in to Cogtic to review your usage and plan.\n"
     )
-    return send_email(email, subject, body)
+    return await send_email(email, subject, body)

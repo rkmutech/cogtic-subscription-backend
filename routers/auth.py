@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
@@ -23,7 +23,11 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=UserOut, status_code=201)
-def register(payload: UserCreate, db: Session = Depends(getDb)):
+def register(
+    payload: UserCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(getDb),
+):
     if db.query(User).filter(User.email == payload.email).first():
         raise HTTPException(status_code=409, detail="Email already registered")
 
@@ -46,7 +50,7 @@ def register(payload: UserCreate, db: Session = Depends(getDb)):
     commit_with_logging(db, "register the new user")
     db.refresh(user)
     logger.info("Registered user id=%s with tenant id=%s", user.id, tenant.id)
-    send_welcome_email(user.email, name)
+    background_tasks.add_task(send_welcome_email, user.email, name)
     return user
 
 

@@ -46,7 +46,7 @@ def assign_plan(tenant_id: int, payload: TenantPlanUpdate, db: Session = Depends
 
 
 @router.get("/{tenant_id}/usage-summary", response_model=UsageSummaryOut | None)
-def get_usage_summary(
+async def get_usage_summary(
     tenant_id: int,
     db: Session = Depends(getDb),
     current_user: User = Depends(getCurrentUser),
@@ -61,7 +61,7 @@ def get_usage_summary(
         return None
     try:
         summary = calculate_usage_summary(db, tenant)
-        notify_usage_thresholds(db, tenant, summary)
+        await notify_usage_thresholds(db, tenant, summary)
         return summary
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
